@@ -13,8 +13,6 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
-const cors = require("cors");
-
 app.use(cors({
   origin: [
     "http://localhost:5173",
