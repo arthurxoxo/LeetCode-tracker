@@ -13,7 +13,16 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+const cors = require("cors");
+
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://leet-code-tracker-indol.vercel.app"
+  ],
+  credentials: true
+}));
+
 app.use(express.json());
 
 let dbConnected = false;

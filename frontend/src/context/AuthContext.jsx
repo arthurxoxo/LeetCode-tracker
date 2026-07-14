@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
-const API = 'http://localhost:5000/api';
+const API = 'https://leetcode-tracker-domx.onrender.com';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
