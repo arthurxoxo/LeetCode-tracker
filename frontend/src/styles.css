@@ -1374,6 +1374,20 @@ input:focus, select:focus, textarea:focus {
   outline: 1px solid #fff;
 }
 
+/* Today's cell — glowing ring so it's always visible */
+.heatmap-cell.heatmap-today {
+  outline: 2px solid #818cf8;
+  outline-offset: 1px;
+  box-shadow: 0 0 6px rgba(129, 140, 248, 0.7);
+  z-index: 5;
+}
+
+/* Future cells — dimmed, no interaction */
+.heatmap-cell.heatmap-future {
+  opacity: 0.15;
+  cursor: default;
+}
+
 .heatmap-detail-status {
   margin-top: 16px;
   padding-top: 10px;

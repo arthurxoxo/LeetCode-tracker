@@ -67,24 +67,34 @@ export default function Analytics() {
       }
     }
 
-    // Start grid 26 weeks ago, aligning with the beginning of that week (Sunday)
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 182);
-    // Find the Sunday of that week
-    const startDay = startDate.getDay();
-    startDate.setDate(startDate.getDate() - startDay);
+    // Anchor the grid so TODAY is always the last cell.
+    // Find the Sunday that starts the current week, then go back 25 more weeks.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    // Build 26 columns of 7 days each
+    // Find the Sunday of the current week (day 0 = Sunday)
+    const currentSunday = new Date(today);
+    currentSunday.setDate(today.getDate() - today.getDay());
+
+    // Start Sunday is 25 weeks before the current week's Sunday
+    const startDate = new Date(currentSunday);
+    startDate.setDate(currentSunday.getDate() - 25 * 7);
+
+    // Build 26 columns of 7 days each (last column ends this Saturday or today)
     for (let c = 0; c < 26; c++) {
       const colDays = [];
       for (let r = 0; r < 7; r++) {
         const d = new Date(startDate);
         d.setDate(startDate.getDate() + (c * 7 + r));
         const key = d.toISOString().slice(0, 10);
-        const count = solvedMap[key] || 0;
-        
+
+        // Don't show future dates
+        const isFuture = d > today;
+        const count = isFuture ? 0 : (solvedMap[key] || 0);
+        const isToday = key === today.toISOString().slice(0, 10);
+
         let level = 0;
-        if (count > 0) {
+        if (!isFuture && count > 0) {
           if (count === 1) level = 1;
           else if (count === 2) level = 2;
           else level = 3;
@@ -95,6 +105,8 @@ export default function Analytics() {
           dateKey: key,
           count,
           level,
+          isToday,
+          isFuture,
         });
       }
       columns.push(colDays);
@@ -327,9 +339,9 @@ export default function Analytics() {
                       {col.map((day) => (
                         <div
                           key={day.dateKey}
-                          className={`heatmap-cell level-${day.level}`}
-                          title={`${day.count} solved on ${day.date.toLocaleDateString()}`}
-                          onMouseEnter={() => setHoveredCell(day)}
+                          className={`heatmap-cell level-${day.level}${day.isToday ? ' heatmap-today' : ''}${day.isFuture ? ' heatmap-future' : ''}`}
+                          title={day.isToday ? `Today — ${day.count} solved` : day.isFuture ? 'Future' : `${day.count} solved on ${day.date.toLocaleDateString()}`}
+                          onMouseEnter={() => !day.isFuture && setHoveredCell(day)}
                           onMouseLeave={() => setHoveredCell(null)}
                         ></div>
                       ))}
