@@ -43,22 +43,30 @@ export default function Analytics() {
     const columns = [];
     const solvedMap = {};
 
-    // 1. Map local solved problems
+    // Helper: returns "YYYY-MM-DD" in LOCAL timezone (not UTC)
+    const toLocalKey = (date) => {
+      const d = new Date(date);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    // 1. Map local solved problems using LOCAL date
     problems
       .filter((p) => p.status === 'Solved' && p.date)
       .forEach((p) => {
-        const dateKey = p.date.slice(0, 10);
+        const dateKey = toLocalKey(p.date);
         solvedMap[dateKey] = (solvedMap[dateKey] || 0) + 1;
       });
 
-    // 2. Map LeetCode calendar submissions
+    // 2. Map LeetCode calendar submissions using LOCAL date
     if (user?.leetcodeCalendar && user.leetcodeCalendar !== '{}') {
       try {
         const calendar = JSON.parse(user.leetcodeCalendar);
         Object.entries(calendar).forEach(([timestamp, count]) => {
           if (count > 0) {
-            const dateStr = new Date(parseInt(timestamp) * 1000).toISOString().slice(0, 10);
-            // Sum local logs and LeetCode logs, or take maximum to avoid duplicate counts of auto-imported items
+            const dateStr = toLocalKey(new Date(parseInt(timestamp) * 1000));
             solvedMap[dateStr] = Math.max(solvedMap[dateStr] || 0, count);
           }
         });
@@ -68,9 +76,9 @@ export default function Analytics() {
     }
 
     // Anchor the grid so TODAY is always the last cell.
-    // Find the Sunday that starts the current week, then go back 25 more weeks.
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayKey = toLocalKey(today); // e.g. "2026-07-20" in IST
 
     // Find the Sunday of the current week (day 0 = Sunday)
     const currentSunday = new Date(today);
@@ -86,12 +94,12 @@ export default function Analytics() {
       for (let r = 0; r < 7; r++) {
         const d = new Date(startDate);
         d.setDate(startDate.getDate() + (c * 7 + r));
-        const key = d.toISOString().slice(0, 10);
+        const key = toLocalKey(d); // LOCAL date key
 
         // Don't show future dates
         const isFuture = d > today;
         const count = isFuture ? 0 : (solvedMap[key] || 0);
-        const isToday = key === today.toISOString().slice(0, 10);
+        const isToday = key === todayKey;
 
         let level = 0;
         if (!isFuture && count > 0) {

@@ -96,41 +96,52 @@ export default function Dashboard() {
     }
   }, [localStats, user]);
 
+  // Helper: "YYYY-MM-DD" in LOCAL timezone (avoids UTC off-by-one for IST)
+  const toLocalKey = (date) => {
+    const d = new Date(date);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   // Calculate Streaks
   const streakInfo = useMemo(() => {
-    // If Leetcode is connected, we can use the LeetCode streak!
+    // If Leetcode is connected, use the LeetCode streak from the API
     if (user?.leetcodeStats && user.leetcodeStats.solvedAll > 0) {
       return {
         current: user.leetcodeStats.streak || 0,
-        longest: Math.max(user.leetcodeStats.streak || 0, 0), // we don't have longest Leetcode streak from graphql, map to current
+        longest: user.leetcodeStats.streak || 0,
         isLeetcode: true
       };
     }
 
+    // Local streak — use LOCAL date keys to avoid timezone off-by-one
     const dates = problems
       .filter((p) => p.status === 'Solved' && p.date)
-      .map((p) => p.date.slice(0, 10));
-    
+      .map((p) => toLocalKey(p.date));
+
     const uniqueDates = [...new Set(dates)].sort((a, b) => new Date(b) - new Date(a));
-    
+
     let currentStreak = 0;
     let longestStreak = 0;
     let tempStreak = 0;
 
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+    const todayStr = toLocalKey(new Date());
+    const yesterdayD = new Date();
+    yesterdayD.setDate(yesterdayD.getDate() - 1);
+    const yesterdayStr = toLocalKey(yesterdayD);
 
-    // Calculate Current Streak
+    // Calculate Current Streak (walk backwards from today)
     if (uniqueDates.includes(todayStr) || uniqueDates.includes(yesterdayStr)) {
-      let checkDate = new Date();
+      const checkDate = new Date();
+      checkDate.setHours(0, 0, 0, 0);
+      // If nothing today but solved yesterday, start from yesterday
       if (!uniqueDates.includes(todayStr) && uniqueDates.includes(yesterdayStr)) {
         checkDate.setDate(checkDate.getDate() - 1);
       }
-      
       while (true) {
-        const dateKey = checkDate.toISOString().slice(0, 10);
+        const dateKey = toLocalKey(checkDate);
         if (uniqueDates.includes(dateKey)) {
           currentStreak++;
           checkDate.setDate(checkDate.getDate() - 1);
@@ -143,15 +154,13 @@ export default function Dashboard() {
     // Calculate Longest Streak
     if (uniqueDates.length > 0) {
       let prevDate = null;
-      let sortedAsc = [...uniqueDates].sort((a, b) => new Date(a) - new Date(b));
-      
-      for (let dateStr of sortedAsc) {
+      const sortedAsc = [...uniqueDates].sort((a, b) => new Date(a) - new Date(b));
+      for (const dateStr of sortedAsc) {
         const currentDate = new Date(dateStr);
         if (prevDate === null) {
           tempStreak = 1;
         } else {
-          const diffTime = Math.abs(currentDate - prevDate);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          const diffDays = Math.round((currentDate - prevDate) / (1000 * 60 * 60 * 24));
           if (diffDays === 1) {
             tempStreak++;
           } else if (diffDays > 1) {
@@ -167,20 +176,18 @@ export default function Dashboard() {
     return { current: currentStreak, longest: longestStreak, isLeetcode: false };
   }, [problems, user]);
 
-  // Generate last 7 days visual data
+  // Generate last 7 days visual data — all dates in LOCAL timezone
   const last7Days = useMemo(() => {
     const days = [];
     const solvedDates = new Set();
 
-    // If Leetcode calendar is available, use it!
+    // If Leetcode calendar is available, merge it using LOCAL date keys
     if (user?.leetcodeCalendar && user.leetcodeCalendar !== '{}') {
       try {
         const calendar = JSON.parse(user.leetcodeCalendar);
-        // Calendar contains unix seconds as keys, convert to dateKeys
         Object.entries(calendar).forEach(([timestamp, count]) => {
           if (count > 0) {
-            const dateStr = new Date(parseInt(timestamp) * 1000).toISOString().slice(0, 10);
-            solvedDates.add(dateStr);
+            solvedDates.add(toLocalKey(new Date(parseInt(timestamp) * 1000)));
           }
         });
       } catch (err) {
@@ -188,19 +195,21 @@ export default function Dashboard() {
       }
     }
 
-    // Also merge local problems
+    // Also merge local problems using LOCAL date keys
     problems
       .filter((p) => p.status === 'Solved' && p.date)
-      .forEach((p) => solvedDates.add(p.date.slice(0, 10)));
+      .forEach((p) => solvedDates.add(toLocalKey(p.date)));
+
+    const todayKey = toLocalKey(new Date());
 
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateKey = d.toISOString().slice(0, 10);
+      const dateKey = toLocalKey(d);
       days.push({
         name: d.toLocaleDateString('en-US', { weekday: 'narrow' }),
         date: dateKey,
-        isToday: dateKey === new Date().toISOString().slice(0, 10),
+        isToday: dateKey === todayKey,
         solved: solvedDates.has(dateKey),
       });
     }
