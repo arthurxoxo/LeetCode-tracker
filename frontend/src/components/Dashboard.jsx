@@ -105,23 +105,31 @@ export default function Dashboard() {
     return `${y}-${m}-${day}`;
   };
 
-  // Calculate Streaks
+  // Calculate Streaks — always compute from real data (LeetCode calendar + local problems)
   const streakInfo = useMemo(() => {
-    // If Leetcode is connected, use the LeetCode streak from the API
-    if (user?.leetcodeStats && user.leetcodeStats.solvedAll > 0) {
-      return {
-        current: user.leetcodeStats.streak || 0,
-        longest: user.leetcodeStats.streak || 0,
-        isLeetcode: true
-      };
+    const activeDatesSet = new Set();
+
+    // 1. Collect dates from LeetCode submissionCalendar (if available)
+    if (user?.leetcodeCalendar && user.leetcodeCalendar !== '{}') {
+      try {
+        const calendar = JSON.parse(user.leetcodeCalendar);
+        Object.entries(calendar).forEach(([timestamp, count]) => {
+          if (count > 0) {
+            activeDatesSet.add(toLocalKey(new Date(parseInt(timestamp) * 1000)));
+          }
+        });
+      } catch (err) {
+        console.error('Error parsing leetcode calendar for streak:', err);
+      }
     }
 
-    // Local streak — use LOCAL date keys to avoid timezone off-by-one
-    const dates = problems
+    // 2. Collect dates from locally solved problems
+    problems
       .filter((p) => p.status === 'Solved' && p.date)
-      .map((p) => toLocalKey(p.date));
+      .forEach((p) => activeDatesSet.add(toLocalKey(p.date)));
 
-    const uniqueDates = [...new Set(dates)].sort((a, b) => new Date(b) - new Date(a));
+    const uniqueDates = [...activeDatesSet];
+    const hasLeetcode = user?.leetcodeStats && user.leetcodeStats.solvedAll > 0;
 
     let currentStreak = 0;
     let longestStreak = 0;
@@ -132,7 +140,7 @@ export default function Dashboard() {
     yesterdayD.setDate(yesterdayD.getDate() - 1);
     const yesterdayStr = toLocalKey(yesterdayD);
 
-    // Calculate Current Streak (walk backwards from today)
+    // Calculate Current Streak (walk backwards from today or yesterday)
     if (uniqueDates.includes(todayStr) || uniqueDates.includes(yesterdayStr)) {
       const checkDate = new Date();
       checkDate.setHours(0, 0, 0, 0);
@@ -173,7 +181,7 @@ export default function Dashboard() {
       longestStreak = Math.max(longestStreak, tempStreak);
     }
 
-    return { current: currentStreak, longest: longestStreak, isLeetcode: false };
+    return { current: currentStreak, longest: longestStreak, isLeetcode: hasLeetcode };
   }, [problems, user]);
 
   // Generate last 7 days visual data — all dates in LOCAL timezone
